@@ -1,0 +1,11 @@
+menu "Project-specific configuration"
+
+config UART_TX_PIN
+    int "UART TX Pin"
+    default 17
+
+config UART_RX_PIN
+    int "UART RX Pin"
+    default 16
+
+endmenu

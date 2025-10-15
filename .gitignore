@@ -1,0 +1,33 @@
+# Build outputs
+/build/
+/sdkconfig
+/sdkconfig.old
+
+# Eclipse/IDE files
+*.project
+*.cproject
+*.launch
+.vscode/
+
+# CMake build files
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+compile_commands.json
+*.cmake
+
+# ESP-IDF Python environment
+/.env/
+/.venv/
+/idf_tools.json
+
+# Backup files
+*~
+*.bak
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
