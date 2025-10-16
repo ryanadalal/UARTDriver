@@ -1,11 +1,22 @@
 #include <stdint.h>
 
-#define UART_NUM 1
 #define UART_TX_PIN 17
 #define UART_RX_PIN 16
-#define UART_BAUD 9600
 
-void uart_init(int baud_rate);
-void uart_write_byte(uint8_t byte);
-uint8_t uart_read_byte(void);
-void uart_write_string(const char* str);
+typedef struct {
+    volatile uint32_t *fifo_reg;
+    volatile uint32_t *status_reg;
+    volatile uint32_t *conf0_reg;
+    volatile uint32_t *conf1_reg;
+    volatile uint32_t *clkdiv_reg;
+} uart_t;
+
+extern uart_t uart0;
+extern uart_t uart1;
+extern uart_t uart2;
+
+void uart_init(uart_t* uart_num, int baud_rate);
+void uart_write_byte(uart_t* uart_num, uint8_t byte);
+uint8_t uart_read_byte(uart_t* uart_num, uint8_t* out_byte);
+void uart_write_string(uart_t* uart_num, const char* str);
+void configure_gpio_for_uart2(void);
