@@ -32,6 +32,7 @@ int app_main(void){
         }
     }
 
+    // send multiple strings and wait for new line delimeter
     ESP_LOGI(TAG, "Beginning string test");
     uart_write_string(&uart2, "Hello ");
     uart_write_string(&uart2, "there");
