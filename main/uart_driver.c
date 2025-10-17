@@ -42,42 +42,37 @@
 #define UART_RXFIFO_CNT_MASK (0xFF << 0) // mask for RX FIFO count
 #define UART_TXFIFO_CNT_MASK (0xFF << 16) // mask for TX FIFO count
 
-//
-// ==========================================================================
-//
-
-// GPIO Matrix and Pin Configuration
-#define GPIO_OUT_REG 0x3FF44004
-#define GPIO_OUT_W1TS_REG 0x3FF44008
-#define GPIO_OUT_W1TC_REG 0x3FF4400C
-#define GPIO_ENABLE_REG 0x3FF44020
-#define GPIO_ENABLE_W1TS_REG 0x3FF44024
-#define GPIO_ENABLE_W1TC_REG 0x3FF44028
-#define GPIO_IN_REG 0x3FF4403C
-#define GPIO_PIN16_REG 0x3FF44088
-#define GPIO_PIN17_REG 0x3FF4408C
-#define GPIO_FUNC16_OUT_SEL_REG 0x3FF44570
-#define GPIO_FUNC17_OUT_SEL_REG 0x3FF44574
+/*
+* GPIO Pin and IO matrix configurations 
+*/
+// GPIO matrix registers
+#define GPIO_ENABLE_REG 0x3FF44020 // configure pin as input/output
+#define GPIO_FUNC_OUT_SEL_REG(n) (0x3FF44530 + (n)*4)
 #define GPIO_FUNC_IN_SEL_CFG_REG(n) (0x3FF44130 + (n)*4)
+#define GPIO_PINN_REG(n) (0x3FF44088 + (n)*4)
+
+// Matrix settings
+#define GPIO_SIG_IN_SEL (1 << 7) // ignore IO_MUX route through GPIO matrix
 
 // UART signal numbers for GPIO matrix
 #define U2TXD_OUT_IDX 198
 #define U2RXD_IN_IDX 198
-//
-// ==========================================================================
-//
+#define U1TXD_OUT_IDX 17
+#define U1RXD_IN_IDX 17
+#define U0TXD_OUT_IDX 14
+#define U0RXD_IN_IDX 14
 
-// peripheral enable and reset
+/*
+ * Peripheral enable and reset
+ */
 // register positions
 #define DPORT_PERIP_CLK_EN_REG (0x3FF000C0)
 #define DPORT_PERIP_RST_EN_REG (0x3FF000C4)
 // bit masks
 #define DPORT_UART_MEM_CLOCK_EN_MASK (1 << 24)
-
 #define DPORT_UART1_CLK_EN_MASK (1 << 5)
 #define DPORT_UART0_CLK_EN_MASK (1 << 2)
 #define DPORT_UART2_CLK_EN_MASK (1 << 23)
-
 #define DPORT_UART1_RST_HOLD_MASK (1 << 5)
 #define DPORT_UART0_RST_HOLD_MASK (1 << 2)
 #define DPORT_UART2_RST_HOLD_MASK (1 << 23)
@@ -106,37 +101,23 @@ uart_t uart2 = {
     .clkdiv_reg = (volatile uint32_t *)(UART2_BASE + UART_CLKDIV_REG),
 };
 
-//
-// ==========================================================================
-//
-void configure_gpio_for_uart2(void) {
-    // Configure GPIO16 as input (RX)
+void configure_gpio_for_uart2(uint8_t rx_gpio_num, uint8_t tx_gpio_num) {
     volatile uint32_t *gpio_enable_reg = (volatile uint32_t *)GPIO_ENABLE_REG;
-    *gpio_enable_reg &= ~(1 << 16); // Disable output for GPIO16
-    
-    // Configure GPIO17 as output (TX) 
-    *gpio_enable_reg |= (1 << 17); // Enable output for GPIO17
-    
-    // Set IO_MUX for GPIO16 and GPIO17 to function 2 (GPIO function)
-    *(volatile uint32_t*)0x3FF4904C = (*(volatile uint32_t*)0x3FF4904C & ~0x7) | 2; // GPIO16
-    *(volatile uint32_t*)0x3FF49050 = (*(volatile uint32_t*)0x3FF49050 & ~0x7) | 2; // GPIO17
+    *gpio_enable_reg &= ~(1 << rx_gpio_num); // Disable output for rx pin
+    *gpio_enable_reg |= (1 << tx_gpio_num); // Enable output for tx pin
     
     // Configure GPIO matrix routing
-    // Route UART2 TX signal to GPIO17
-    *(volatile uint32_t*)GPIO_FUNC17_OUT_SEL_REG = U2TXD_OUT_IDX;
-    
-    // Route GPIO16 to UART2 RX signal
-    *(volatile uint32_t*)GPIO_FUNC_IN_SEL_CFG_REG(U2RXD_IN_IDX) = (1 << 7) | 16; // bit 7 = sig_in_sel, bits 5:0 = gpio_num
-    
-    // Configure GPIO pin registers
-    *(volatile uint32_t*)GPIO_PIN16_REG = 0; // Clear any special config
-    *(volatile uint32_t*)GPIO_PIN17_REG = 0; // Clear any special config
-}
-//
-// ==========================================================================
-//
+    // Route UART2 TX signal to correct pin
+    *(volatile uint32_t*)GPIO_FUNC_OUT_SEL_REG(tx_gpio_num) = U2TXD_OUT_IDX;
 
-void uart_init(uart_t* uart_num, int baud_rate){
+    // Route pin to UART2 RX signal
+    *(volatile uint32_t*)GPIO_FUNC_IN_SEL_CFG_REG(U2RXD_IN_IDX) = GPIO_SIG_IN_SEL | (rx_gpio_num << 0); // bit 7 = GPIO_SIG_IN_SEL, bits 5:0 = gpio_num
+
+    *(volatile uint32_t*)GPIO_PINN_REG(tx_gpio_num) = 0; // Clear any special config
+    *(volatile uint32_t*)GPIO_PINN_REG(rx_gpio_num) = 0; // Clear any special config
+}
+
+void uart_init(uart_t* uart_num, int baud_rate, uint8_t rx_gpio_num, uint8_t tx_gpio_num){
     // enable UART1 peripheral clock
     volatile uint32_t *clk_en_reg = (volatile uint32_t *)DPORT_PERIP_CLK_EN_REG;
     uint32_t clk_en_val = *clk_en_reg;
@@ -168,7 +149,7 @@ void uart_init(uart_t* uart_num, int baud_rate){
     
     // If this is UART2, configure the GPIO pins
     if (uart_num == &uart2) {
-        configure_gpio_for_uart2();
+        configure_gpio_for_uart2(rx_gpio_num, tx_gpio_num);
     }
 }
 
@@ -208,6 +189,7 @@ uint8_t uart_read_byte(uart_t* uart_num, uint8_t* out_byte){
 }
 
 void uart_write_string(uart_t* uart_num, const char* str){
+    // write each byte individually
     while(*str){
         uart_write_byte(uart_num, (uint8_t)(*str++));
     }

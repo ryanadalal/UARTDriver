@@ -15,8 +15,8 @@ extern uart_t uart0;
 extern uart_t uart1;
 extern uart_t uart2;
 
-void uart_init(uart_t* uart_num, int baud_rate);
+void uart_init(uart_t* uart_num, int baud_rate, uint8_t rx_gpio_num, uint8_t tx_gpio_num);
 void uart_write_byte(uart_t* uart_num, uint8_t byte);
 uint8_t uart_read_byte(uart_t* uart_num, uint8_t* out_byte);
 void uart_write_string(uart_t* uart_num, const char* str);
-void configure_gpio_for_uart2(void);
+void configure_gpio_for_uart2(uint8_t rx_gpio_num, uint8_t tx_gpio_num);
