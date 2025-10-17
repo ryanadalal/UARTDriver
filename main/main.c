@@ -13,7 +13,7 @@ int app_main(void){
     // Initialize UART2 with GPIO configuration
     uart_init(&uart2, 9600, UART2_RX_PIN, UART2_TX_PIN);
     
-    ESP_LOGI(TAG, "Starting test...");
+    ESP_LOGI(TAG, "Starting...");
     
     uart_write_byte(&uart2, 42);
     ESP_LOGI(TAG, "Wrote byte 42");
@@ -23,9 +23,7 @@ int app_main(void){
         ESP_LOGI(TAG, "Immediately read: %d", received);
     } else {
         ESP_LOGI(TAG, "No immediate data");
-        
-        // Wait up to 1 second
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 100; i++) { // wait up to 1 second for data
             if (uart_read_byte(&uart2, &received)) {
                 ESP_LOGI(TAG, "Read after %d ms: %d", i*10, received);
                 break;
@@ -33,11 +31,18 @@ int app_main(void){
             vTaskDelay(pdMS_TO_TICKS(10));
         }
     }
-    
-    ESP_LOGI(TAG, "Test complete");
-    
-    while(1) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    }
+
+    ESP_LOGI(TAG, "Beginning string test");
+    uart_write_string(&uart2, "Hello ");
+    uart_write_string(&uart2, "there");
+    uart_write_string(&uart2, "!\n");
+    vTaskDelay(pdMS_TO_TICKS(100));
+    char* buffer = malloc(100);
+    uart_read_string(&uart2, buffer, 100, '\n');
+    ESP_LOGI(TAG, "Received: %s", buffer);
+    free(buffer);
+
+    ESP_LOGI(TAG, "Complete");
+
     return 0;
 }
