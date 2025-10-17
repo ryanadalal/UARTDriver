@@ -101,34 +101,59 @@ uart_t uart2 = {
     .clkdiv_reg = (volatile uint32_t *)(UART2_BASE + UART_CLKDIV_REG),
 };
 
-void configure_gpio_for_uart2(uint8_t rx_gpio_num, uint8_t tx_gpio_num) {
+void configure_gpio_for_uart(uart_t* uart_num, uint8_t rx_gpio_num, uint8_t tx_gpio_num) {
     volatile uint32_t *gpio_enable_reg = (volatile uint32_t *)GPIO_ENABLE_REG;
     *gpio_enable_reg &= ~(1 << rx_gpio_num); // Disable output for rx pin
     *gpio_enable_reg |= (1 << tx_gpio_num); // Enable output for tx pin
     
-    // Configure GPIO matrix routing
-    // Route UART2 TX signal to correct pin
-    *(volatile uint32_t*)GPIO_FUNC_OUT_SEL_REG(tx_gpio_num) = U2TXD_OUT_IDX;
+    uint8_t uart_txd_out_idx = 0;
+    uint8_t uart_rxd_in_idx = 0;
 
-    // Route pin to UART2 RX signal
-    *(volatile uint32_t*)GPIO_FUNC_IN_SEL_CFG_REG(U2RXD_IN_IDX) = GPIO_SIG_IN_SEL | (rx_gpio_num << 0); // bit 7 = GPIO_SIG_IN_SEL, bits 5:0 = gpio_num
+    if (uart_num == &uart0) {
+        uart_txd_out_idx = U0TXD_OUT_IDX;
+        uart_rxd_in_idx = U0RXD_IN_IDX;
+    } else if (uart_num == &uart1) {
+        uart_txd_out_idx = U1TXD_OUT_IDX;
+        uart_rxd_in_idx = U1RXD_IN_IDX;
+    } else if (uart_num == &uart2) {
+        uart_txd_out_idx = U2TXD_OUT_IDX;
+        uart_rxd_in_idx = U2RXD_IN_IDX;
+    }
+
+    // Configure GPIO matrix routing
+    // Route UART TX signal to correct pin
+    *(volatile uint32_t*)GPIO_FUNC_OUT_SEL_REG(tx_gpio_num) = uart_txd_out_idx;
+
+    // Route pin to UART RX signal
+    *(volatile uint32_t*)GPIO_FUNC_IN_SEL_CFG_REG(uart_rxd_in_idx) = GPIO_SIG_IN_SEL | (rx_gpio_num << 0); // bit 7 = GPIO_SIG_IN_SEL, bits 5:0 = gpio_num
 
     *(volatile uint32_t*)GPIO_PINN_REG(tx_gpio_num) = 0; // Clear any special config
     *(volatile uint32_t*)GPIO_PINN_REG(rx_gpio_num) = 0; // Clear any special config
 }
 
 void uart_init(uart_t* uart_num, int baud_rate, uint8_t rx_gpio_num, uint8_t tx_gpio_num){
-    // enable UART1 peripheral clock
-    volatile uint32_t *clk_en_reg = (volatile uint32_t *)DPORT_PERIP_CLK_EN_REG;
-    uint32_t clk_en_val = *clk_en_reg;
-    clk_en_val &= ~(DPORT_UART2_CLK_EN_MASK | DPORT_UART1_CLK_EN_MASK | DPORT_UART0_CLK_EN_MASK | DPORT_UART_MEM_CLOCK_EN_MASK);
-    clk_en_val |= DPORT_UART2_CLK_EN_MASK | DPORT_UART1_CLK_EN_MASK | DPORT_UART0_CLK_EN_MASK | DPORT_UART_MEM_CLOCK_EN_MASK;
-    *clk_en_reg = clk_en_val;
-    // reset UART1 peripheral
-    volatile uint32_t *rst_reg = (volatile uint32_t *)DPORT_PERIP_RST_EN_REG;
-    *rst_reg |= DPORT_UART2_RST_HOLD_MASK | DPORT_UART1_RST_HOLD_MASK | DPORT_UART0_RST_HOLD_MASK;
-    *rst_reg &= ~(DPORT_UART2_RST_HOLD_MASK | DPORT_UART1_RST_HOLD_MASK | DPORT_UART0_RST_HOLD_MASK);
+    uint32_t dport_uart_clk_en_mask = 0;
+    uint32_t dport_uart_rst_mask = 0;
 
+    if (uart_num == &uart0) {
+        dport_uart_clk_en_mask = DPORT_UART0_CLK_EN_MASK;
+        dport_uart_rst_mask = DPORT_UART0_RST_HOLD_MASK;
+    } else if (uart_num == &uart1) {
+        dport_uart_clk_en_mask = DPORT_UART1_CLK_EN_MASK;
+        dport_uart_rst_mask = DPORT_UART1_RST_HOLD_MASK;
+    } else if (uart_num == &uart2) {
+        dport_uart_clk_en_mask = DPORT_UART2_CLK_EN_MASK;
+        dport_uart_rst_mask = DPORT_UART2_RST_HOLD_MASK;
+    }
+
+    // enable UART peripheral clock
+    volatile uint32_t *clk_en_reg = (volatile uint32_t *)DPORT_PERIP_CLK_EN_REG;
+    *clk_en_reg |= dport_uart_clk_en_mask | DPORT_UART_MEM_CLOCK_EN_MASK;
+    
+    // reset UART peripheral
+    volatile uint32_t *rst_reg = (volatile uint32_t *)DPORT_PERIP_RST_EN_REG;
+    *rst_reg |= dport_uart_rst_mask;
+    *rst_reg &= ~dport_uart_rst_mask;
 
     // UART for 8N1 bits - 8 data, no parity, 1 stop bit
     volatile uint32_t *conf_0_reg = uart_num->conf0_reg;
@@ -147,10 +172,7 @@ void uart_init(uart_t* uart_num, int baud_rate, uint8_t rx_gpio_num, uint8_t tx_
     conf_1_val |= UART_RX_FLOW_DISABLE | UART_TXFIFO_EMPTY_THRHD | UART_RXFIFO_FULL_THRHD | UART_RX_TOUT_EN | UART_RX_TOUT_THRHD;
     *conf_1_reg = conf_1_val;
     
-    // If this is UART2, configure the GPIO pins
-    if (uart_num == &uart2) {
-        configure_gpio_for_uart2(rx_gpio_num, tx_gpio_num);
-    }
+    configure_gpio_for_uart(uart_num, rx_gpio_num, tx_gpio_num);
 }
 
 void uart_write_byte(uart_t* uart_num, uint8_t byte){
@@ -165,7 +187,7 @@ void uart_write_byte(uart_t* uart_num, uint8_t byte){
     *fifo = byte;
 }
 
-uint8_t uart_block_read_byte(uart_t* uart_num){
+void uart_block_read_byte(uart_t* uart_num, uint8_t* out_byte){
     volatile uint32_t *status = uart_num->status_reg;
     volatile uint32_t *fifo = uart_num->fifo_reg;
 
@@ -174,7 +196,7 @@ uint8_t uart_block_read_byte(uart_t* uart_num){
         ;
     }
 
-    return (uint8_t)(*fifo & 0xFF);
+    *out_byte = (uint8_t)(*fifo & 0xFF);
 }
 uint8_t uart_read_byte(uart_t* uart_num, uint8_t* out_byte){
     volatile uint32_t *status = uart_num->status_reg;
@@ -195,15 +217,20 @@ void uart_write_string(uart_t* uart_num, const char* str){
     }
 }
 
+void uart_read_string(uart_t* uart_num, char* buffer, size_t max_len, char delimeter){
+    size_t index = 0;
+    uint8_t byte;
 
-int _write(int fd, const void *buf, size_t count) {
-    const uint8_t *data = (const uint8_t *)buf;
+    while (index < max_len - 1) {
+        while (!uart_read_byte(uart_num, &byte)) {
+            ;
+        }
 
-    if (fd != 1 && fd != 2) return -1; // stdout/stderr only
-
-    for (size_t i = 0; i < count; i++) {
-        uart_write_byte(&uart0, data[i]); 
+        if (byte == delimeter) {
+            break;
+        }
+        buffer[index++] = (char)byte;
     }
 
-    return count;
+    buffer[index] = '\0';
 }
