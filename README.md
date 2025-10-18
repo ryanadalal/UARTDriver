@@ -17,6 +17,33 @@ Chip - ESP32-WROOM-32
 - **Basic I/O Functions:** Provides basic functions for reading and writing bytes as well as strings.
 - **Non-Blocking Read:** Includes a non-blocking `uart_read_byte` function to enable greater control.
 
+## Hardware Registers Used
+
+This driver enables UART by direct manipulation of the ESP32's hardware registers. Here are the registers:
+
+### Peripheral Control
+
+-   **`DPORT_PERIP_CLK_EN_REG`**: Enables the clock, thus activating the target UART peripheral.
+-   **`DPORT_PERIP_RST_EN_REG`**: Resets the UART peripheral before configuring it to ensure it starts in a known state
+
+### UART Configuration
+
+-   **`UART_CONF0_REG`**: Configures the UART data format. In this case: 1 low start bit, 8 data bits, no parity, and 1 high stop bit (8N1).
+-   **`UART_CLKDIV_REG`**: Configures the clock divider based on the `baud_rate`. This value assumes a 80MHz APB clock as found in the TRM.
+-   **`UART_CONF1_REG`**: Configures FIFO settings: thresholds for TX and RX FIFO buffers and RX timeout (enabled).
+
+### GPIO Matrix Configuration
+
+-   **`GPIO_ENABLE_REG`**: Configures the flow direction of the GPIO pins (input for RX, output for TX).
+-   **`GPIO_FUNC_OUT_SEL_REG`**: Connects the UART's TX to the correct GPIO pin via the GPIO matrix.
+-   **`GPIO_FUNC_IN_SEL_CFG_REG`**: Connects the signal from the desired GPIO pin to the RX UART via the GPIO matrix.
+-   **`GPIO_PINN_REG`**: Clear any pre-existing special GPIO pin configuration.
+
+### Data I/O
+
+-   **`UART_STATUS_REG`**: Used in checking the number of bytes in the TX and RX FIFOs (`txfifo_cnt` and `rxfifo_cnt`) and ensuring they are not full or empty when performing operations.
+-   **`UART_FIFO_REG`**: The combined TX RX register: write sends data to TX FIFO; read gets data from RX FIFO.
+
 ## API Reference
 
 ### `void uart_init(uart_t* uart_num, int baud_rate, uint8_t rx_gpio_num, uint8_t tx_gpio_num)`
