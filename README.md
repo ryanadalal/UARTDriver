@@ -1,4 +1,4 @@
-# ESP32 Custom UART Driver
+# ESP32 Custom UART Driver in Pure C
 
 ## Overview
 
